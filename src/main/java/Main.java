@@ -9,7 +9,7 @@ public class Main {
     private static Connection connection;
 
     private static Connection newConnection() throws SQLException {
-        String url = "jdbc:postgresql://localhost/JDBS_study";
+        String url = "jdbc:postgresql://localhost/JDBC_study";
         Properties properties = new Properties();
         properties.setProperty("user", "postgres");
         properties.setProperty("password", "qwerty123");
@@ -55,7 +55,7 @@ public class Main {
         }
 
         while (resultSet.next()){
-            BigDecimal passportNumber = resultSet.getBigDecimal("passport_number");
+            String passportNumber = resultSet.getString("passport_number");
             String secondName = resultSet.getString("second_name");
             String firstName = resultSet.getString("first_name");
             String lastName = resultSet.getString("last_name");
@@ -67,28 +67,46 @@ public class Main {
 
     private static void showHumansInCertainCity(int cityID) throws SQLException {
         executeSQLandShowResult(
-                "SELECT public.\"Humans\".* FROM public.\"Humans\", public.\"Residents\", public.\"Cities\", public.\"Streets\", public.\"Houses\", public.\"Flats\"\n" +
-                        "WHERE \n" +
-                        "\tpassport_number = human_link AND \n" +
-                        "\tflat_link = flat_id AND \n" +
-                        "\thouse_link = house_id AND \n" +
-                        "\tstreet_link = street_id AND\n" +
-                        "\tcity_link = city_id AND\n" +
-                        "\tcity_id = ?;\n",
+                "SELECT \n" +
+                        "\tpublic.\"Humans\".* \n" +
+                        "FROM \n" +
+                        "\tpublic.\"Humans\"\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Streets\"\n" +
+                        "\tON city_link = ?\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Houses\"\n" +
+                        "\tON street_link = street_id\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Flats\"\n" +
+                        "\tON house_link = house_id\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Residents\"\n" +
+                        "\tON flat_link = flat_id AND human_link = human_id;",
                 cityID);
     }
 
     private static void showHumansInCertainFlat(int flatID) throws SQLException {
-        executeSQLandShowResult("SELECT public.\"Humans\".* FROM public.\"Humans\", public.\"Residents\"\n" +
-                        "WHERE \n" +
-                        "\tpassport_number = human_link AND flat_link = ?;\n",
+        executeSQLandShowResult("SELECT \n" +
+                        "\tpublic.\"Humans\".* \n" +
+                        "FROM\n" +
+                        "\tpublic.\"Humans\"\n" +
+                        "\tJOIN public.\"Residents\"\n" +
+                        "\t\tON human_id = human_link AND flat_link = ?;",
                 flatID);
     }
 
     private static void showHumansInCertainHouse(int houseID) throws SQLException {
-        executeSQLandShowResult("SELECT public.\"Humans\".* FROM public.\"Humans\", public.\"Residents\", public.\"Houses\", public.\"Flats\"\n" +
-                "WHERE \n" +
-                "\tpassport_number = human_link AND (flat_link = flat_id) AND (house_link = house_id) AND house_id = ?\n",
+        executeSQLandShowResult("SELECT \n" +
+                        "\tpublic.\"Humans\".*\n" +
+                        "FROM \n" +
+                        "\tpublic.\"Humans\" \n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Flats\"\n" +
+                        "\tON house_link = ?\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Residents\"\n" +
+                        "\tON flat_link = flat_id AND human_link = human_id;",
                 houseID);
     }
 
@@ -100,13 +118,19 @@ public class Main {
         streetListFromIN.append("!");
         streetListFromIN = new StringBuilder(streetListFromIN.toString().replace(", !", ")"));
 
-        String query = "SELECT public.\"Humans\".* FROM public.\"Humans\", public.\"Residents\", public.\"Streets\", public.\"Houses\", public.\"Flats\"\n" +
-                "WHERE\n" +
-                "\tpassport_number = human_link AND \n" +
-                "\tflat_link = flat_id AND \n" +
-                "\thouse_link = house_id AND \n" +
-                "\tstreet_link = street_id AND\n" +
-                "\tstreet_id IN "+streetListFromIN+"\n";
+        String query = "SELECT \n" +
+                "\tpublic.\"Humans\".* \n" +
+                "FROM \n" +
+                "\tpublic.\"Humans\"\n" +
+                "\t\n" +
+                "\tJOIN public.\"Houses\"\n" +
+                "\tON street_link in"+ streetListFromIN +"\n" +
+                "\t\n" +
+                "\tJOIN public.\"Flats\"\n" +
+                "\tON house_link = house_id\n" +
+                "\t\n" +
+                "\tJOIN public.\"Residents\"\n" +
+                "\tON flat_link = flat_id AND human_link = human_id;";
 
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         preparedStatement.execute();
@@ -115,28 +139,15 @@ public class Main {
     }
 
     private static void changesFlatsResidents(int firstFlatID, int secondFlatID) throws SQLException {
-        String query = "CREATE TABLE public.\"Temp_variables\" (\n" +
-                "\t\"flat_1\" integer NOT NULL,\n" +
-                "\t\"flat_2\" integer NOT NULL\n" +
-                ");\n" +
-                "INSERT INTO public.\"Temp_variables\"(flat_1, flat_2)\n" +
-                "VALUES(?, ?); --Какие квартиры обменять жильцами\n" +
-                "\n" +
-                "CREATE TABLE public.\"Temp_humans_ids_from_2_flat\" AS\n" +
-                "SELECT human_link FROM public.\"Residents\"\n" +
-                "WHERE\n" +
-                "\tflat_link = (SELECT flat_2 FROM public.\"Temp_variables\");\n" +
+        String query = "WITH variables AS (SELECT ARRAY[?, ?] AS var_index)\n" +
                 "\n" +
                 "UPDATE public.\"Residents\"\n" +
-                "SET flat_link = (SELECT flat_2 FROM public.\"Temp_variables\") \n" +
-                "WHERE flat_link = (SELECT flat_1 FROM public.\"Temp_variables\");\n" +
-                "\n" +
-                "UPDATE public.\"Residents\"\n" +
-                "SET flat_link = (SELECT flat_1 FROM public.\"Temp_variables\") \n" +
-                "WHERE human_link IN (SELECT human_link FROM public.\"Temp_humans_ids_from_2_flat\");\n" +
-                "\n" +
-                "DROP TABLE IF EXISTS public.\"Temp_variables\";\n" +
-                "DROP TABLE IF EXISTS public.\"Temp_humans_ids_from_2_flat\";\n";
+                "SET flat_link = \n" +
+                "\tCASE\n" +
+                "    \tWHEN flat_link = (SELECT var_index[1] FROM variables) THEN (SELECT var_index[2] FROM variables)\n" +
+                "\t\tWHEN flat_link = (SELECT var_index[2] FROM variables) THEN (SELECT var_index[1] FROM variables)\n" +
+                "    END\n" +
+                "WHERE flat_link IN ((SELECT var_index[1] FROM variables), (SELECT var_index[2] FROM variables));";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         preparedStatement.setInt(1, firstFlatID);
         preparedStatement.setInt(2, secondFlatID);
@@ -144,42 +155,45 @@ public class Main {
     }
 
     private static void moveResidentsToNewFlat(int oldFlat, int newFlat) throws SQLException {
-        String query = "CREATE TABLE public.\"Temp_variables\" (\n" +
-                "\t\"old_flat\" integer NOT NULL,\n" +
-                "\t\"new_flat\" integer NOT NULL\n" +
-                ");\n" +
-                "INSERT INTO public.\"Temp_variables\"(old_flat, new_flat)\n" +
-                "VALUES(?, ?); \n" +
-                "\n" +
-                "INSERT INTO public.\"Residents\" (human_link, flat_link)\n" +
-                "SELECT human_link, new_flat FROM public.\"Residents\", public.\"Temp_variables\"\n" +
-                "WHERE flat_link = (SELECT old_flat FROM public.\"Temp_variables\");\n" +
-                "\n" +
-                "DELETE FROM public.\"Residents\"\n" +
-                "WHERE flat_link = (SELECT old_flat FROM public.\"Temp_variables\");\n" +
-                "\n" +
-                "DROP TABLE IF EXISTS public.\"Temp_variables\";\n";
+        String query = "UPDATE public.\"Residents\"\n" +
+                "\tSET flat_link = ?\n" +
+                "WHERE flat_link = ?;";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, oldFlat);
-        preparedStatement.setInt(2, newFlat);
+        preparedStatement.setInt(1, newFlat);
+        preparedStatement.setInt(2, oldFlat);
         preparedStatement.execute();
     }
 
-    private static void deleteHumanFromFlat(int passportNumber) throws SQLException {
+    private static void deleteHumanFromFlat(int human_id) throws SQLException {
         String query = "DELETE FROM public.\"Residents\"\n" +
                 "WHERE human_link = ?";
         PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, passportNumber);
+        preparedStatement.setInt(1, human_id);
         preparedStatement.execute();
+    }
+
+    private static void registerHumanInFlat(int human_id, int flat_id) throws SQLException {
+        String query = "INSERT INTO public.\"Residents\" (human_link, flat_link)\n" +
+                "VALUES (?, ?);";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, human_id);
+        preparedStatement.setInt(2, flat_id);
+        preparedStatement.execute();
+
     }
 
     private static void showFlatOwners(int flatID) throws SQLException {
         executeSQLandShowResult(
-                "SELECT public.\"Humans\".* FROM public.\"Humans\", public.\"Flats\", public.\"Flats_owners\"\n" +
-                        "WHERE\n" +
-                        "(passport_number = human_link) AND (flat_link = flat_id) AND flat_id = ?",
+                "SELECT \n" +
+                        "\tpublic.\"Humans\".* \n" +
+                        "FROM \n" +
+                        "\tpublic.\"Humans\"\n" +
+                        "\tJOIN public.\"Flats_owners\"\n" +
+                        "\tON human_id = human_link AND flat_link = ?;",
                 flatID) ;
     }
+
+
 
     private static void executeSqlQueryFromFIle(String fileName) throws SQLException {
         String query = getFileContent(fileName);
@@ -199,12 +213,16 @@ public class Main {
 
         createTables();
         fillTables();
-        showHumansInCertainCity(2);
-       // showHumansInCertainFlat(42);
-        //showHumansInCertainHouse(3);
-        //showHumansFromStreetList(new int[]{7, 9});
+
+        showHumansInCertainFlat(42);
         //showFlatOwners(1);
-        //changesFlatsResidents(2,42);
+        //showHumansInCertainCity(2);
+        //showHumansInCertainHouse(3);
+       // showHumansFromStreetList(new int[]{7, 9});
+       // registerHumanInFlat(1, 4);
+       // deleteHumanFromFlat(1);
+       // moveResidentsToNewFlat(42, 8);
+        //changesFlatsResidents(2,8);
 
 
         connection.close();
