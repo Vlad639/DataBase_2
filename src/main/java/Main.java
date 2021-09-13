@@ -40,12 +40,17 @@ public class Main {
         return "";
     }
 
-    private static void createTables() throws SQLException {
-        executeSqlQueryFromFIle("src/main/resources/create_tables.sql");
+    private static void executeSqlQueryFromFIle(String fileName) throws SQLException {
+        String query = getFileContent(fileName);
+        executeSQL(query);
     }
 
-    private static void fillTables() throws SQLException {
-        executeSqlQueryFromFIle("src/main/resources/fill_all_tables.sql");
+    private static void executeSQLandShowResult(String query, int id) throws SQLException {
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, id);
+        preparedStatement.execute();
+        ResultSet resultSet = preparedStatement.getResultSet();
+        showResidentsFromResultSet(resultSet);
     }
 
     private static void showResidentsFromResultSet(ResultSet resultSet) throws SQLException {
@@ -63,6 +68,61 @@ public class Main {
             System.out.print(passportNumber+" | ");
             System.out.format("%15s | %15s |%15s | %10s |\n", secondName, firstName, lastName, bornDate);
         }
+    }
+
+    public static void main(String[] args) throws SQLException {
+        connection = newConnection();
+
+        createTables();
+        fillTables();
+
+        showHumansInCertainFlat(42);
+        //showFlatOwners(1);
+        //showHumansInCertainCity(2);
+        //showHumansInCertainHouse(3);
+        //showHumansFromStreetList(new int[]{7, 9});
+        //registerHumanInFlat(1, 4);
+        //deleteHumanFromFlat(1);
+        //moveResidentsToNewFlat(42, 8);
+        //changesFlatsResidents(2,8);
+
+
+        connection.close();
+
+    }
+
+    private static void createTables() throws SQLException {
+        executeSqlQueryFromFIle("src/main/resources/create_tables.sql");
+    }
+
+    private static void fillTables() throws SQLException {
+        executeSqlQueryFromFIle("src/main/resources/fill_all_tables.sql");
+    }
+
+    private static void showHumansInCertainFlat(int flatID) throws SQLException {
+        executeSQLandShowResult(
+                "SELECT \n" +
+                        "\tpublic.\"Humans\".* \n" +
+                        "FROM\n" +
+                        "\tpublic.\"Humans\"\n" +
+                        "\tJOIN public.\"Residents\"\n" +
+                        "\t\tON human_id = human_link\n" +
+                        "\tWHERE flat_link = ?;",
+                flatID);
+    }
+
+    private static void showFlatOwners(int flatID) throws SQLException {
+        executeSQLandShowResult(
+                "SELECT \n" +
+                        "\tpublic.\"Humans\".* \n" +
+                        "FROM \n" +
+                        "\tpublic.\"Humans\"\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Flats_owners\"\n" +
+                        "\tON human_link = human_id \n" +
+                        "WHERE\n" +
+                        "\tflat_link = ?;",
+                flatID) ;
     }
 
     private static void showHumansInCertainCity(int cityID) throws SQLException {
@@ -86,18 +146,6 @@ public class Main {
                         "\t\n" +
                         "\tWHERE city_link = ?;",
                 cityID);
-    }
-
-    private static void showHumansInCertainFlat(int flatID) throws SQLException {
-        executeSQLandShowResult(
-                "SELECT \n" +
-                        "\tpublic.\"Humans\".* \n" +
-                        "FROM\n" +
-                        "\tpublic.\"Humans\"\n" +
-                        "\tJOIN public.\"Residents\"\n" +
-                        "\t\tON human_id = human_link\n" +
-                        "\tWHERE flat_link = ?;",
-                flatID);
     }
 
     private static void showHumansInCertainHouse(int houseID) throws SQLException {
@@ -147,6 +195,33 @@ public class Main {
         showResidentsFromResultSet(resultSet);
     }
 
+    private static void registerHumanInFlat(int human_id, int flat_id) throws SQLException {
+        String query = "INSERT INTO public.\"Residents\" (human_link, flat_link)\n" +
+                "VALUES (?, ?);";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, human_id);
+        preparedStatement.setInt(2, flat_id);
+        preparedStatement.execute();
+    }
+
+    private static void deleteHumanFromFlat(int human_id) throws SQLException {
+        String query = "DELETE FROM public.\"Residents\"\n" +
+                "WHERE human_link = ?";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, human_id);
+        preparedStatement.execute();
+    }
+
+    private static void moveResidentsToNewFlat(int oldFlat, int newFlat) throws SQLException {
+        String query = "UPDATE public.\"Residents\"\n" +
+                "\tSET flat_link = ?\n" +
+                "WHERE flat_link = ?;";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, newFlat);
+        preparedStatement.setInt(2, oldFlat);
+        preparedStatement.execute();
+    }
+
     private static void changesFlatsResidents(int firstFlatID, int secondFlatID) throws SQLException {
         String query = "WITH variables AS (SELECT ARRAY[?, ?] AS var_index)\n" +
                 "\n" +
@@ -163,81 +238,4 @@ public class Main {
         preparedStatement.execute();
     }
 
-    private static void moveResidentsToNewFlat(int oldFlat, int newFlat) throws SQLException {
-        String query = "UPDATE public.\"Residents\"\n" +
-                "\tSET flat_link = ?\n" +
-                "WHERE flat_link = ?;";
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, newFlat);
-        preparedStatement.setInt(2, oldFlat);
-        preparedStatement.execute();
-    }
-
-    private static void deleteHumanFromFlat(int human_id) throws SQLException {
-        String query = "DELETE FROM public.\"Residents\"\n" +
-                "WHERE human_link = ?";
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, human_id);
-        preparedStatement.execute();
-    }
-
-    private static void registerHumanInFlat(int human_id, int flat_id) throws SQLException {
-        String query = "INSERT INTO public.\"Residents\" (human_link, flat_link)\n" +
-                "VALUES (?, ?);";
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, human_id);
-        preparedStatement.setInt(2, flat_id);
-        preparedStatement.execute();
-
-    }
-
-    private static void showFlatOwners(int flatID) throws SQLException {
-        executeSQLandShowResult(
-                "SELECT \n" +
-                        "\tpublic.\"Humans\".* \n" +
-                        "FROM \n" +
-                        "\tpublic.\"Humans\"\n" +
-                        "\t\n" +
-                        "\tJOIN public.\"Flats_owners\"\n" +
-                        "\tON human_link = human_id \n" +
-                        "WHERE\n" +
-                        "\tflat_link = ?;",
-                flatID) ;
-    }
-
-
-
-    private static void executeSqlQueryFromFIle(String fileName) throws SQLException {
-        String query = getFileContent(fileName);
-        executeSQL(query);
-    }
-
-    private static void executeSQLandShowResult(String query, int id) throws SQLException {
-        PreparedStatement preparedStatement = connection.prepareStatement(query);
-        preparedStatement.setInt(1, id);
-        preparedStatement.execute();
-        ResultSet resultSet = preparedStatement.getResultSet();
-        showResidentsFromResultSet(resultSet);
-    }
-
-    public static void main(String[] args) throws SQLException {
-        connection = newConnection();
-
-        createTables();
-        fillTables();
-
-        showHumansInCertainFlat(42);
-       // showFlatOwners(1);
-       // showHumansInCertainCity(2);
-       // showHumansInCertainHouse(3);
-       // showHumansFromStreetList(new int[]{7, 9});
-       //registerHumanInFlat(1, 4);
-       // deleteHumanFromFlat(1);
-       // moveResidentsToNewFlat(42, 8);
-        //changesFlatsResidents(2,8);
-
-
-        connection.close();
-
-    }
 }
