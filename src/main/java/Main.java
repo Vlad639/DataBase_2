@@ -68,12 +68,9 @@ public class Main {
     private static void showHumansInCertainCity(int cityID) throws SQLException {
         executeSQLandShowResult(
                 "SELECT \n" +
-                        "\tpublic.\"Humans\".* \n" +
+                        "\tpublic.\"Humans\".*\n" +
                         "FROM \n" +
-                        "\tpublic.\"Humans\"\n" +
-                        "\t\n" +
-                        "\tJOIN public.\"Streets\"\n" +
-                        "\tON city_link = ?\n" +
+                        "\tpublic.\"Streets\"\n" +
                         "\t\n" +
                         "\tJOIN public.\"Houses\"\n" +
                         "\tON street_link = street_id\n" +
@@ -82,31 +79,41 @@ public class Main {
                         "\tON house_link = house_id\n" +
                         "\t\n" +
                         "\tJOIN public.\"Residents\"\n" +
-                        "\tON flat_link = flat_id AND human_link = human_id;",
+                        "\tON flat_link = flat_id\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Humans\"\n" +
+                        "\tON human_link = human_id\n" +
+                        "\t\n" +
+                        "\tWHERE city_link = ?;",
                 cityID);
     }
 
     private static void showHumansInCertainFlat(int flatID) throws SQLException {
-        executeSQLandShowResult("SELECT \n" +
+        executeSQLandShowResult(
+                "SELECT \n" +
                         "\tpublic.\"Humans\".* \n" +
                         "FROM\n" +
                         "\tpublic.\"Humans\"\n" +
                         "\tJOIN public.\"Residents\"\n" +
-                        "\t\tON human_id = human_link AND flat_link = ?;",
+                        "\t\tON human_id = human_link\n" +
+                        "\tWHERE flat_link = ?;",
                 flatID);
     }
 
     private static void showHumansInCertainHouse(int houseID) throws SQLException {
-        executeSQLandShowResult("SELECT \n" +
+        executeSQLandShowResult(
+                "SELECT \n" +
                         "\tpublic.\"Humans\".*\n" +
                         "FROM \n" +
-                        "\tpublic.\"Humans\" \n" +
-                        "\t\n" +
-                        "\tJOIN public.\"Flats\"\n" +
-                        "\tON house_link = ?\n" +
+                        "\tpublic.\"Flats\" \n" +
                         "\t\n" +
                         "\tJOIN public.\"Residents\"\n" +
-                        "\tON flat_link = flat_id AND human_link = human_id;",
+                        "\tON flat_link = flat_id\n" +
+                        "\t\n" +
+                        "\tJOIN public.\"Humans\"\n" +
+                        "\tON human_link = human_id\n" +
+                        "\t\n" +
+                        "\tWHERE house_link = ?;",
                 houseID);
     }
 
@@ -121,16 +128,18 @@ public class Main {
         String query = "SELECT \n" +
                 "\tpublic.\"Humans\".* \n" +
                 "FROM \n" +
-                "\tpublic.\"Humans\"\n" +
-                "\t\n" +
-                "\tJOIN public.\"Houses\"\n" +
-                "\tON street_link in"+ streetListFromIN +"\n" +
+                "\tpublic.\"Houses\"\n" +
                 "\t\n" +
                 "\tJOIN public.\"Flats\"\n" +
                 "\tON house_link = house_id\n" +
                 "\t\n" +
                 "\tJOIN public.\"Residents\"\n" +
-                "\tON flat_link = flat_id AND human_link = human_id;";
+                "\tON flat_link = flat_id\n" +
+                "\t\n" +
+                "\tJOIN public.\"Humans\"\n" +
+                "\tON human_link = human_id\n" +
+                "\t\n" +
+                "\tWHERE street_link in "+streetListFromIN+";";
 
         PreparedStatement preparedStatement = connection.prepareStatement(query);
         preparedStatement.execute();
@@ -188,8 +197,11 @@ public class Main {
                         "\tpublic.\"Humans\".* \n" +
                         "FROM \n" +
                         "\tpublic.\"Humans\"\n" +
+                        "\t\n" +
                         "\tJOIN public.\"Flats_owners\"\n" +
-                        "\tON human_id = human_link AND flat_link = ?;",
+                        "\tON human_link = human_id \n" +
+                        "WHERE\n" +
+                        "\tflat_link = ?;",
                 flatID) ;
     }
 
@@ -215,11 +227,11 @@ public class Main {
         fillTables();
 
         showHumansInCertainFlat(42);
-        //showFlatOwners(1);
-        //showHumansInCertainCity(2);
-        //showHumansInCertainHouse(3);
+       // showFlatOwners(1);
+       // showHumansInCertainCity(2);
+       // showHumansInCertainHouse(3);
        // showHumansFromStreetList(new int[]{7, 9});
-       // registerHumanInFlat(1, 4);
+       //registerHumanInFlat(1, 4);
        // deleteHumanFromFlat(1);
        // moveResidentsToNewFlat(42, 8);
         //changesFlatsResidents(2,8);
